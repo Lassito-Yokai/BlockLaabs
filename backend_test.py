@@ -158,6 +158,60 @@ class DjangoLibraryTester:
             404
         )
 
+    def test_documents_by_type(self):
+        """Test documents filtered by type - NEW FEATURE"""
+        return self.run_test(
+            "Documents by Type (Guide)",
+            "GET",
+            "client/library/type/Guide/",
+            200
+        )
+
+    def test_documents_by_type_with_filters(self):
+        """Test documents by type with additional filters - NEW FEATURE"""
+        return self.run_test(
+            "Documents by Type with Filters",
+            "GET",
+            "client/library/type/Guide/?search=test&country=France&language=French",
+            200
+        )
+
+    def test_documents_by_country(self):
+        """Test documents filtered by country - NEW FEATURE"""
+        return self.run_test(
+            "Documents by Country (France)",
+            "GET",
+            "client/library/country/France/",
+            200
+        )
+
+    def test_documents_by_country_with_filters(self):
+        """Test documents by country with additional filters - NEW FEATURE"""
+        return self.run_test(
+            "Documents by Country with Filters",
+            "GET",
+            "client/library/country/France/?search=test&type=Guide&language=French",
+            200
+        )
+
+    def test_documents_by_category(self):
+        """Test documents filtered by source category - NEW FEATURE"""
+        return self.run_test(
+            "Documents by Category (EMA)",
+            "GET",
+            "client/library/category/ema/",
+            200
+        )
+
+    def test_document_list_horizontal(self):
+        """Test horizontal document list view - NEW FEATURE"""
+        return self.run_test(
+            "Document List Horizontal",
+            "GET",
+            "client/library/documents/horizontal/",
+            200
+        )
+
     def test_main_app_root(self):
         """Test main application root"""
         return self.run_test(

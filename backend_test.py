@@ -265,6 +265,15 @@ def main():
     tester.test_download_document_nonexistent()
     tester.test_api_metadata_nonexistent()
     
+    # Test NEW FILTERING FEATURES
+    print("\n🆕 Testing New Filtering Features...")
+    tester.test_documents_by_type()
+    tester.test_documents_by_type_with_filters()
+    tester.test_documents_by_country()
+    tester.test_documents_by_country_with_filters()
+    tester.test_documents_by_category()
+    tester.test_document_list_horizontal()
+    
     # Print results
     print("\n" + "=" * 50)
     print(f"📊 Test Results: {tester.tests_passed}/{tester.tests_run} tests passed")

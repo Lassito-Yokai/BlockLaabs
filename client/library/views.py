@@ -18,10 +18,35 @@ import os
 
 logger = logging.getLogger(__name__)
 
+from django.shortcuts import render, get_object_or_404, redirect
+from django.http import JsonResponse, HttpResponse, Http404
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.db.models import Q, Count
+from django.core.paginator import Paginator
+from django.contrib import messages
+from django.utils import timezone
+from django.core.cache import cache
+from rest_framework import generics, status
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from client.library.models import Document, DocumentCategory, RegulatoryAuthority, DocumentTranslation
+# Import des modèles RawDocument pour la bibliothèque
+from rawdocs.models import RawDocument
+import json
+import logging
+import os
+
+logger = logging.getLogger(__name__)
+
 def library_dashboard(request):
     """Vue principale de la library - affiche les documents des métadonneurs"""
-    # Statistiques générales basées sur RawDocument
-    total_documents = RawDocument.objects.filter(is_validated=True).count()
+    # Utiliser le cache pour les statistiques avec timeout de 5 minutes
+    total_documents = cache.get('total_documents')
+    if total_documents is None:
+        total_documents = RawDocument.objects.filter(is_validated=True).count()
+        cache.set('total_documents', total_documents, 300)  # 5 minutes
+    
     pending_validation = RawDocument.objects.filter(is_validated=False).count()
     total_metadonneurs = RawDocument.objects.values('owner').distinct().count()
     
@@ -30,62 +55,73 @@ def library_dashboard(request):
         is_validated=True
     ).select_related('owner').order_by('-created_at')[:10]
     
-    # Statistiques par type de document
-    document_type_stats = RawDocument.objects.filter(
-        is_validated=True
-    ).exclude(doc_type='').values('doc_type').annotate(
-        count=Count('id')
-    ).order_by('-count')[:5]
+    # Statistiques par type de document avec cache
+    document_type_stats = cache.get('document_type_stats')
+    if document_type_stats is None:
+        document_type_stats = RawDocument.objects.filter(
+            is_validated=True
+        ).exclude(doc_type='').values('doc_type').annotate(
+            count=Count('id')
+        ).order_by('-count')[:5]
+        cache.set('document_type_stats', document_type_stats, 300)
     
-    # Statistiques par pays
-    country_stats = RawDocument.objects.filter(
-        is_validated=True
-    ).exclude(country='').values('country').annotate(
-        count=Count('id')
-    ).order_by('-count')[:5]
+    # Statistiques par pays avec cache
+    country_stats = cache.get('country_stats') 
+    if country_stats is None:
+        country_stats = RawDocument.objects.filter(
+            is_validated=True
+        ).exclude(country='').values('country').annotate(
+            count=Count('id')
+        ).order_by('-count')[:5]
+        cache.set('country_stats', country_stats, 300)
     
-    # 🆕 Statistiques par source avec catégories personnalisées
-    source_stats = RawDocument.objects.filter(
-        is_validated=True
-    ).exclude(source='').values('source').annotate(
-        count=Count('id')
-    ).order_by('-count')
-    
-    # Créer des catégories basées sur les sources
-    categories = {}
-    neutral_count = 0
-    
-    for stat in source_stats:
-        source_name = stat['source'].upper()
-        count = stat['count']
+    # 🆕 Statistiques par source avec catégories personnalisées avec cache
+    source_categories = cache.get('source_categories')
+    if source_categories is None:
+        source_stats = RawDocument.objects.filter(
+            is_validated=True
+        ).exclude(source='').values('source').annotate(
+            count=Count('id')
+        ).order_by('-count')
         
-        # Mapper les sources aux catégories connues
-        if 'EMA' in source_name or 'EUROPEAN' in source_name:
-            if 'EMA' not in categories:
-                categories['EMA'] = {'name': 'EMA', 'count': 0, 'color': '#3498db'}
-            categories['EMA']['count'] += count
-        elif 'FDA' in source_name:
-            if 'FDA' not in categories:
-                categories['FDA'] = {'name': 'FDA', 'count': 0, 'color': '#e74c3c'}
-            categories['FDA']['count'] += count
-        elif 'ICH' in source_name:
-            if 'ICH' not in categories:
-                categories['ICH'] = {'name': 'ICH', 'count': 0, 'color': '#f39c12'}
-            categories['ICH']['count'] += count
-        elif 'ANSM' in source_name:
-            if 'ANSM' not in categories:
-                categories['ANSM'] = {'name': 'ANSM', 'count': 0, 'color': '#2ecc71'}
-            categories['ANSM']['count'] += count
-        elif 'MHRA' in source_name:
-            if 'MHRA' not in categories:
-                categories['MHRA'] = {'name': 'MHRA', 'count': 0, 'color': '#9b59b6'}
-            categories['MHRA']['count'] += count
-        else:
-            neutral_count += count
-    
-    # Ajouter la catégorie Neutre si nécessaire
-    if neutral_count > 0:
-        categories['NEUTRE'] = {'name': 'Neutre', 'count': neutral_count, 'color': '#95a5a6'}
+        # Créer des catégories basées sur les sources
+        categories = {}
+        neutral_count = 0
+        
+        for stat in source_stats:
+            source_name = stat['source'].upper()
+            count = stat['count']
+            
+            # Mapper les sources aux catégories connues
+            if 'EMA' in source_name or 'EUROPEAN' in source_name:
+                if 'EMA' not in categories:
+                    categories['EMA'] = {'name': 'EMA', 'count': 0, 'color': '#3498db'}
+                categories['EMA']['count'] += count
+            elif 'FDA' in source_name:
+                if 'FDA' not in categories:
+                    categories['FDA'] = {'name': 'FDA', 'count': 0, 'color': '#e74c3c'}
+                categories['FDA']['count'] += count
+            elif 'ICH' in source_name:
+                if 'ICH' not in categories:
+                    categories['ICH'] = {'name': 'ICH', 'count': 0, 'color': '#f39c12'}
+                categories['ICH']['count'] += count
+            elif 'ANSM' in source_name:
+                if 'ANSM' not in categories:
+                    categories['ANSM'] = {'name': 'ANSM', 'count': 0, 'color': '#2ecc71'}
+                categories['ANSM']['count'] += count
+            elif 'MHRA' in source_name:
+                if 'MHRA' not in categories:
+                    categories['MHRA'] = {'name': 'MHRA', 'count': 0, 'color': '#9b59b6'}
+                categories['MHRA']['count'] += count
+            else:
+                neutral_count += count
+        
+        # Ajouter la catégorie Neutre si nécessaire
+        if neutral_count > 0:
+            categories['NEUTRE'] = {'name': 'Neutre', 'count': neutral_count, 'color': '#95a5a6'}
+        
+        source_categories = categories
+        cache.set('source_categories', source_categories, 300)
     
     context = {
         'total_documents': total_documents,
@@ -94,7 +130,7 @@ def library_dashboard(request):
         'recent_documents': recent_documents,
         'document_type_stats': document_type_stats,
         'country_stats': country_stats,
-        'source_categories': categories,  # 🆕 Nouvelles catégories par source
+        'source_categories': source_categories,  # 🆕 Nouvelles catégories par source
     }
     
     return render(request, 'client/library/dashboard.html', context)

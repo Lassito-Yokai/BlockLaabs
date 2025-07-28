@@ -267,6 +267,108 @@ def document_list_horizontal(request):
     
     return render(request, 'client/library/document_list_horizontal.html', context)
 
+def documents_by_type(request, doc_type):
+    """Documents filtrés par type avec affichage horizontal"""
+    # Paramètres de filtrage additionnels
+    search = request.GET.get('search', '')
+    country = request.GET.get('country', '')
+    language = request.GET.get('language', '')
+    
+    # Construction de la requête sur RawDocument
+    documents_qs = RawDocument.objects.filter(
+        is_validated=True,
+        doc_type__icontains=doc_type
+    ).select_related('owner')
+    
+    if search:
+        documents_qs = documents_qs.filter(
+            Q(title__icontains=search) | 
+            Q(source__icontains=search) |
+            Q(context__icontains=search)
+        )
+    
+    if country:
+        documents_qs = documents_qs.filter(country__icontains=country)
+    
+    if language:
+        documents_qs = documents_qs.filter(language__icontains=language)
+    
+    documents_qs = documents_qs.order_by('-created_at')
+    
+    # Pagination
+    paginator = Paginator(documents_qs, 50)
+    page_number = request.GET.get('page')
+    documents = paginator.get_page(page_number)
+    
+    # Options de filtrage
+    countries = RawDocument.objects.filter(is_validated=True).exclude(country='').values_list('country', flat=True).distinct()
+    languages = RawDocument.objects.filter(is_validated=True).exclude(language='').values_list('language', flat=True).distinct()
+    
+    context = {
+        'documents': documents,
+        'doc_type': doc_type,
+        'countries': countries,
+        'languages': languages,
+        'filters': {
+            'search': search,
+            'country': country,
+            'language': language,
+        }
+    }
+    
+    return render(request, 'client/library/documents_by_type.html', context)
+
+def documents_by_country(request, country):
+    """Documents filtrés par pays avec affichage horizontal"""
+    # Paramètres de filtrage additionnels
+    search = request.GET.get('search', '')
+    document_type = request.GET.get('type', '')
+    language = request.GET.get('language', '')
+    
+    # Construction de la requête sur RawDocument
+    documents_qs = RawDocument.objects.filter(
+        is_validated=True,
+        country__icontains=country
+    ).select_related('owner')
+    
+    if search:
+        documents_qs = documents_qs.filter(
+            Q(title__icontains=search) | 
+            Q(source__icontains=search) |
+            Q(context__icontains=search)
+        )
+    
+    if document_type:
+        documents_qs = documents_qs.filter(doc_type__icontains=document_type)
+    
+    if language:
+        documents_qs = documents_qs.filter(language__icontains=language)
+    
+    documents_qs = documents_qs.order_by('-created_at')
+    
+    # Pagination
+    paginator = Paginator(documents_qs, 50)
+    page_number = request.GET.get('page')
+    documents = paginator.get_page(page_number)
+    
+    # Options de filtrage
+    document_types = RawDocument.objects.filter(is_validated=True).exclude(doc_type='').values_list('doc_type', flat=True).distinct()
+    languages = RawDocument.objects.filter(is_validated=True).exclude(language='').values_list('language', flat=True).distinct()
+    
+    context = {
+        'documents': documents,
+        'country': country,
+        'document_types': document_types,
+        'languages': languages,
+        'filters': {
+            'search': search,
+            'type': document_type,
+            'language': language,
+        }
+    }
+    
+    return render(request, 'client/library/documents_by_country.html', context)
+
 def document_detail(request, pk):
     """Détail d'un RawDocument avec ses métadonnées extraites par les métadonneurs"""
     document = get_object_or_404(RawDocument, pk=pk, is_validated=True)

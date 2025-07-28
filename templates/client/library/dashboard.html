@@ -738,7 +738,7 @@
 
                 <div class="authority-stats">
                     {% for country_stat in country_stats %}
-                    <div class="authority-item">
+                    <div class="authority-item" onclick="location.href='{% url 'client:library:documents_by_country' country_stat.country %}'" style="cursor: pointer; transition: all 0.3s ease;">
                         <span class="authority-code">{{ country_stat.country|slice:":3"|upper }}</span>
                         <span class="authority-name">{{ country_stat.country }}</span>
                         <span class="authority-count">{{ country_stat.count }}</span>

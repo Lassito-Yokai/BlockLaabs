@@ -720,7 +720,7 @@
 
                 <div class="category-stats">
                     {% for type_stat in document_type_stats %}
-                    <div class="category-item">
+                    <div class="category-item" onclick="location.href='{% url 'client:library:documents_by_type' type_stat.doc_type %}'" style="cursor: pointer; transition: all 0.3s ease;">
                         <div class="category-color" style="background-color: #3498db;"></div>
                         <span class="category-name">{{ type_stat.doc_type }}</span>
                         <span class="category-count">{{ type_stat.count }}</span>
